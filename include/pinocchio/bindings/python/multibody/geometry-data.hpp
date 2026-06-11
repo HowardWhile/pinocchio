@@ -45,7 +45,9 @@ namespace pinocchio
             .def_readwrite("second", &CollisionPair::second);
 
           StdVectorPythonVisitor<std::vector<CollisionPair>>::expose("StdVec_CollisionPair");
+#ifndef PINOCCHIO_PYTHON_NO_SERIALIZATION
           serialize<std::vector<CollisionPair>>();
+#endif
         }
       }
     }; // struct CollisionPairPythonVisitor

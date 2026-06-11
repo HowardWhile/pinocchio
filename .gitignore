@@ -18,5 +18,6 @@ coverage*
 plot.html
 
 .cache/
+.python-casadi/
 compile_commands.json
 .ruff_cache/

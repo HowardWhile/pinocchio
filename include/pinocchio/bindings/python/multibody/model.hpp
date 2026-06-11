@@ -302,9 +302,9 @@ namespace pinocchio
         JointIndex parent_id,
         const JointModel & jmodel,
         const SE3 & joint_placement,
-        const std::string & joint_name)
+        const bp::object & joint_name)
       {
-        return model.addJoint(parent_id, jmodel, joint_placement, joint_name);
+        return model.addJoint(parent_id, jmodel, joint_placement, objectToString(joint_name));
       }
 
       static JointIndex addJoint1(
@@ -312,15 +312,15 @@ namespace pinocchio
         JointIndex parent_id,
         const JointModel & jmodel,
         const SE3 & joint_placement,
-        const std::string & joint_name,
+        const bp::object & joint_name,
         const VectorXs & max_effort,
         const VectorXs & max_velocity,
         const VectorXs & min_config,
         const VectorXs & max_config)
       {
         return model.addJoint(
-          parent_id, jmodel, joint_placement, joint_name, max_effort, max_velocity, min_config,
-          max_config);
+          parent_id, jmodel, joint_placement, objectToString(joint_name), max_effort, max_velocity,
+          min_config, max_config);
       }
 
       static JointIndex addJoint2(
@@ -328,7 +328,7 @@ namespace pinocchio
         JointIndex parent_id,
         const JointModel & jmodel,
         const SE3 & joint_placement,
-        const std::string & joint_name,
+        const bp::object & joint_name,
         const VectorXs & min_effort,
         const VectorXs & max_effort,
         const VectorXs & min_velocity,
@@ -340,8 +340,8 @@ namespace pinocchio
         const VectorXs & damping)
       {
         return model.addJoint(
-          parent_id, jmodel, joint_placement, joint_name, min_effort, max_effort, min_velocity,
-          max_velocity, min_config, max_config, min_friction, max_friction, damping);
+          parent_id, jmodel, joint_placement, objectToString(joint_name), min_effort, max_effort,
+          min_velocity, max_velocity, min_config, max_config, min_friction, max_friction, damping);
       }
 
       static JointIndex addJoint3(
@@ -349,7 +349,7 @@ namespace pinocchio
         JointIndex parent_id,
         const JointModel & jmodel,
         const SE3 & joint_placement,
-        const std::string & joint_name,
+        const bp::object & joint_name,
         const VectorXs & min_effort,
         const VectorXs & max_effort,
         const VectorXs & min_velocity,
@@ -362,9 +362,14 @@ namespace pinocchio
         const VectorXs & damping)
       {
         return model.addJoint(
-          parent_id, jmodel, joint_placement, joint_name, min_effort, max_effort, min_velocity,
-          max_velocity, min_config, max_config, config_limit_margin, min_friction, max_friction,
-          damping);
+          parent_id, jmodel, joint_placement, objectToString(joint_name), min_effort, max_effort,
+          min_velocity, max_velocity, min_config, max_config, config_limit_margin, min_friction,
+          max_friction, damping);
+      }
+
+      static std::string objectToString(const bp::object & object)
+      {
+        return std::string(bp::extract<const char *>(bp::str(object))());
       }
 
       ///
@@ -397,10 +402,16 @@ namespace pinocchio
         typedef typename Model::ConfigVectorMap ConfigVectorMap;
         typedef bp::map_indexing_suite<ConfigVectorMap, false> map_indexing_suite;
         StdVectorPythonVisitor<std::vector<Index>, true>::expose("StdVec_Index");
+#ifndef PINOCCHIO_PYTHON_NO_SERIALIZATION
         serialize<std::vector<Index>>();
+#endif
         StdVectorPythonVisitor<std::vector<IndexVector>>::expose("StdVec_IndexVector");
+#ifndef PINOCCHIO_PYTHON_NO_SERIALIZATION
         serialize<std::vector<IndexVector>>();
+#endif
+#ifndef PINOCCHIO_PYTHON_NO_SERIALIZATION
         StdVectorPythonVisitor<std::vector<std::string>, true>::expose("StdVec_StdString");
+#endif
         StdVectorPythonVisitor<std::vector<bool>, true>::expose("StdVec_Bool");
         StdVectorPythonVisitor<std::vector<Scalar>, true>::expose("StdVec_Scalar");
         StdVectorPythonVisitor<typename Model::EigenIndexVector, true>::expose("StdVec_EigenIndex");
@@ -413,15 +424,17 @@ namespace pinocchio
         bp::scope().attr("StdVec_Double") = bp::scope().attr("StdVec_Scalar"); // alias
 #endif
 
-        serialize<std::vector<std::string>>();
-        serialize<std::vector<bool>>();
 #ifndef PINOCCHIO_PYTHON_NO_SERIALIZATION
+        serialize<std::vector<std::string>>();
         serialize<std::vector<Scalar>>();
+        serialize<std::vector<bool>>();
 #endif
+#ifndef PINOCCHIO_PYTHON_NO_SERIALIZATION
         bp::class_<typename Model::ConfigVectorMap>("StdMap_String_VectorXd")
           .def(map_indexing_suite())
           .def_pickle(PickleMap<typename Model::ConfigVectorMap>())
           .def(details::overload_base_get_item_for_std_map<typename Model::ConfigVectorMap>());
+#endif
 
         bp::class_<Model>("Model", "Articulated Rigid Body model", bp::no_init)
           .def(ModelPythonVisitor())

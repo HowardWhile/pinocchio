@@ -127,11 +127,15 @@ BOOST_PYTHON_MODULE(PINOCCHIO_PYTHON_MODULE_NAME)
 #if defined(PINOCCHIO_PYTHON_INTERFACE_MAIN_MODULE)
   exposeGeometry();
 #endif // defined(PINOCCHIO_PYTHON_INTERFACE_MAIN_MODULE)
+#if !defined(PINOCCHIO_PYTHON_INTERFACE_WITHOUT_PARSERS)
   exposeParsers();
+#endif
 
   exposeAlgorithms();
   exposeExtras();
+#if !defined(PINOCCHIO_PYTHON_INTERFACE_WITHOUT_SERIALIZATION)
   exposeSerialization();
+#endif
 
 #if defined(PINOCCHIO_PYTHON_INTERFACE_WITH_COLLISION_PYTHON_BINDINGS)                             \
   && defined(PINOCCHIO_PYTHON_INTERFACE_MAIN_MODULE)

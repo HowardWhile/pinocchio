@@ -49,16 +49,16 @@ namespace pinocchio
           const bp::converter::registration * to_reg = bp::converter::registry::query(to_info);
           bp::object to_class_obj(bp::handle<>(bp::borrowed(to_reg->get_class_object())));
           const std::string to_module_name =
-            bp::extract<std::string>(to_class_obj.attr("__module__"));
-          const std::string to_class_name = bp::extract<std::string>(to_class_obj.attr("__name__"));
+            bp::extract<const char *>(to_class_obj.attr("__module__"))();
+          const std::string to_class_name = bp::extract<const char *>(to_class_obj.attr("__name__"))();
 
           const bp::type_info from_info = bp::type_id<From>();
           const bp::converter::registration * from_reg = bp::converter::registry::query(from_info);
           bp::object from_class_obj(bp::handle<>(bp::borrowed(from_reg->get_class_object())));
           const std::string from_module_name =
-            bp::extract<std::string>(from_class_obj.attr("__module__"));
+            bp::extract<const char *>(from_class_obj.attr("__module__"))();
           const std::string from_class_name =
-            bp::extract<std::string>(from_class_obj.attr("__name__"));
+            bp::extract<const char *>(from_class_obj.attr("__name__"))();
 
           const std::string to_full_class_name = to_module_name + "." + to_class_name;
           const std::string from_full_class_name = from_module_name + "." + from_class_name;

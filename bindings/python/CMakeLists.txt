@@ -30,6 +30,17 @@ function(PINOCCHIO_PYTHON_BINDINGS_SPECIFIC_TYPE scalar_name)
     set(${PYTHON_LIB_NAME}_SOURCES ${${PYWRAP}_SOURCES} ${EXTRA_SOURCES})
     set(${PYTHON_LIB_NAME}_HEADERS ${${PYWRAP}_HEADERS} ${EXTRA_HEADERS})
 
+    if(scalar_name STREQUAL "casadi")
+        list(
+            FILTER ${PYTHON_LIB_NAME}_SOURCES
+            EXCLUDE REGEX "/bindings/python/parsers/"
+        )
+        list(
+            FILTER ${PYTHON_LIB_NAME}_SOURCES
+            EXCLUDE REGEX "/bindings/python/serialization/"
+        )
+    endif()
+
     add_library(
         ${PYTHON_LIB_NAME}
         SHARED
@@ -93,6 +104,15 @@ function(PINOCCHIO_PYTHON_BINDINGS_SPECIFIC_TYPE scalar_name)
             PINOCCHIO_PYTHON_CONTEXT_FILE="${PINOCCHIO_PYTHON_CONTEXT_FILE_VALUE}"
             PINOCCHIO_PYTHON_MODULE_NAME=${PYTHON_LIB_NAME}
     )
+    if(scalar_name STREQUAL "casadi")
+        target_compile_definitions(
+            ${PYTHON_LIB_NAME}
+            PRIVATE
+                PINOCCHIO_PYTHON_NO_SERIALIZATION
+                PINOCCHIO_PYTHON_INTERFACE_WITHOUT_PARSERS
+                PINOCCHIO_PYTHON_INTERFACE_WITHOUT_SERIALIZATION
+        )
+    endif()
 
     set_target_properties(
         ${PYTHON_LIB_NAME}
