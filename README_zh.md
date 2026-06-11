@@ -1,29 +1,29 @@
-# Build `pinocchio.casadi` From Source
+# 從原始碼編譯 `pinocchio.casadi`
 
-This document explains how to clone [HowardWhile/pinocchio](https://github.com/HowardWhile/pinocchio) and build a Python-usable `pinocchio.casadi` module from source.
+這份文件描述如何從 [HowardWhile/pinocchio](https://github.com/HowardWhile/pinocchio) 下載原始碼，並編譯出可在 Python 中使用的 `pinocchio.casadi`。
 
-The commands below target Ubuntu / ROS 2 Jazzy / Python 3.12. The build uses a local CasADi Python wheel directory and compiles Pinocchio's CasADi Python wrapper against it.
+以下流程以 Ubuntu / ROS 2 Jazzy / Python 3.12 為例。重點是使用本機安裝的 CasADi wheel，並讓 Pinocchio 的 CasADi Python wrapper 以相容的 ABI 編譯。
 
-## Requirements
+## 需求
 
-Prepare the following tools and libraries:
+請先準備以下工具與套件：
 
 - CMake
-- A C++17 compiler
-- Python 3 and pip
+- C++17 compiler
+- Python 3 與 pip
 - Boost / Boost.Python
 - Eigen3
 - eigenpy
 - urdfdom
-- ROS 2 Jazzy, if you need xacro or ROS-provided urdfdom packages
+- ROS 2 Jazzy 環境，若需要使用 xacro 或 ROS 版本的 urdfdom
 
-On a ROS Jazzy system, source the ROS environment first:
+在 Ubuntu / ROS Jazzy 環境中，可先載入 ROS 環境：
 
 ```bash
 source /opt/ros/jazzy/setup.bash
 ```
 
-## Download The Source
+## 下載原始碼
 
 ```bash
 mkdir -p ~/workspaces/git_ws
@@ -34,32 +34,31 @@ cd pinocchio
 git checkout feature/build-casadi
 ```
 
-If the repository was cloned without submodules, initialize them with:
+若已經 clone 過，但 submodule 尚未初始化：
 
 ```bash
 git submodule update --init --recursive
 ```
 
-## Prepare The CasADi Python Wheel
+## 準備 CasADi Python wheel
 
-Install the CasADi Python wheel into a local directory:
+建立一個本地資料夾放 CasADi wheel 內容：
 
 ```bash
-rm -rf .python-casadi
 python3 -m pip install --target .python-casadi --no-deps casadi
 ```
 
-The `--no-deps` flag is intentional. It prevents pip from installing a newer NumPy wheel into `.python-casadi`. Pinocchio / eigenpy should keep using the system NumPy. If `.python-casadi` contains NumPy 2.x, importing the bindings may produce ABI warnings or crash.
+這裡刻意使用 `--no-deps`，避免 pip 把新的 NumPy wheel 安裝到 `.python-casadi`。Pinocchio / eigenpy 會使用系統的 NumPy，若 `.python-casadi` 中有 NumPy 2.x，可能在 import 時造成 ABI 警告或 crash。
 
-Check that CasADi can be imported:
+確認 CasADi 可被載入：
 
 ```bash
 PYTHONPATH="$PWD/.python-casadi:$PYTHONPATH" python3 -c "import casadi; print(casadi.__version__)"
 ```
 
-## Configure With CMake
+## 設定 CMake
 
-Create separate build and install directories:
+建立獨立的 build 與 install 目錄：
 
 ```bash
 cmake -S . -B build-casadi-abi0 \
@@ -76,36 +75,39 @@ cmake -S . -B build-casadi-abi0 \
   -Deigenpy_DIR=/opt/ros/jazzy/lib/x86_64-linux-gnu/cmake/eigenpy
 ```
 
-> (option) If CMake tries to fetch `jrl-cmakemodules` but your machine has no network access, provide an existing local source directory and add this option to the CMake command:
+> (option) 如果 CMake 嘗試下載 `jrl-cmakemodules`，但目前環境沒有網路，可以先提供一份已存在的 `jrl-cmakemodules` source，並在 CMake 指令中加上：
 >
 > ```shell
 > -DFETCHCONTENT_SOURCE_DIR_JRL-CMAKEMODULES=/path/to/jrl-cmakemodules-src
 > ```
 
-## Build
+
+
+## 編譯
 
 ```bash
 time cmake --build build-casadi-abi0 -j"$(nproc)"
 ```
 
-> (option) To quickly check only the Python wrappers, build these targets:
+> (option) 如果只想先確認 Python wrapper 能否編譯，可使用：
 >
 > ```shell
 > time cmake --build build-casadi-abi0 --target pinocchio_pywrap_default -j"$(nproc)"
 > time cmake --build build-casadi-abi0 --target pinocchio_pywrap_casadi -j"$(nproc)"
 > ```
 
-## Install
+## 安裝
 
 ```bash
 cmake --install build-casadi-abi0
 ```
 
-> The installed Python package will be under `install-casadi-abi0/lib/python3.12/site-packages`.
+> 安裝後，Python package 會位於 `install-casadi-abi0/lib/python3.12/site-packages`
+>
 
-## Set The Runtime Environment
+## 設定執行環境
 
-Before running Python programs, set `PYTHONPATH` and `LD_LIBRARY_PATH`:
+執行 Python 程式前，請設定 `PYTHONPATH` 與 `LD_LIBRARY_PATH`：
 
 ```bash
 export PINOCCHIO_WS="$PWD"
@@ -115,27 +117,27 @@ export PYTHONPATH="$PINOCCHIO_WS/install-casadi-abi0/lib/python3.12/site-package
 export LD_LIBRARY_PATH="$PINOCCHIO_WS/install-casadi-abi0/lib:$PINOCCHIO_WS/.python-casadi/casadi:${LD_LIBRARY_PATH:-}"
 ```
 
-Run these commands from the Pinocchio repository root.
+請在 Pinocchio repo 根目錄執行以上指令。
 
-> If the ROS 2 Jazzy environment has not been loaded yet, run `source /opt/ros/jazzy/setup.bash` first so the ROS / urdfdom library paths are available in the current shell.
+> 如果尚未載入 ROS 2 Jazzy 環境，請先執行 `source /opt/ros/jazzy/setup.bash`，讓 ROS / urdfdom 相關 library path 進入目前 shell。
 
-## Verify `pinocchio.casadi`
+## 驗證 `pinocchio.casadi`
 
-Run a minimal import check:
+先測試 import：
 
 ```bash
 python3 -c "import casadi; from pinocchio import casadi as cpin; print(cpin.__name__)"
 ```
 
-Expected output includes:
+預期輸出包含：
 
 ```text
 pinocchio.casadi
 ```
 
-## Test ABA With Unitree URDFs
+## 使用 Unitree URDF 測試 ABA
 
-Download the Go2 and G1 URDF files into `~/Downloads/test_urdf`:
+下載 Go2 與 G1 的 URDF 到 `~/Downloads/test_urdf`：
 
 ```bash
 mkdir -p "$HOME/Downloads/test_urdf"
@@ -149,26 +151,26 @@ curl -L \
   https://raw.githubusercontent.com/unitreerobotics/unitree_ros/master/robots/g1_description/g1_29dof.urdf
 ```
 
-Sources:
+來源：
 
 - [Unitree Go2 description](https://github.com/unitreerobotics/unitree_ros/tree/master/robots/go2_description)
 - [Unitree G1 description](https://github.com/unitreerobotics/unitree_ros/tree/master/robots/g1_description)
 
-This branch includes a small smoke test. First test Go2:
+此分支提供一個簡單測試程式。先測 Go2：
 
 ```bash
 python3 examples/casadi/urdf-casadi-aba.py \
   "$HOME/Downloads/test_urdf/go2_description.urdf"
 ```
 
-Then test G1:
+再測 G1：
 
 ```bash
 python3 examples/casadi/urdf-casadi-aba.py \
   "$HOME/Downloads/test_urdf/g1_29dof.urdf"
 ```
 
-On success, Go2 prints something like:
+Go2 成功時會看到類似：
 
 ```text
 pinocchio.casadi URDF ABA test
@@ -177,7 +179,7 @@ pinocchio.casadi URDF ABA test
   casadi function inputs: 3, outputs: 1
 ```
 
-On success, G1 prints something like:
+G1 成功時會看到類似：
 
 ```text
 pinocchio.casadi URDF ABA test
@@ -186,34 +188,34 @@ pinocchio.casadi URDF ABA test
   casadi function inputs: 3, outputs: 1
 ```
 
-`aba` means Articulated Body Algorithm. It computes forward dynamics. This smoke test creates symbolic `q`, `v`, and `tau`, then checks that `pinocchio.casadi` can produce a CasADi symbolic acceleration expression.
+`aba` 是 Articulated Body Algorithm，用於前向動力學。這個測試會建立 symbolic `q`、`v`、`tau`，並確認 `pinocchio.casadi` 可以產生 CasADi symbolic acceleration expression。
 
-## Troubleshooting
+## 常見問題
 
-### `casadi` Cannot Be Imported
+### 找不到 `casadi`
 
-Make sure `PYTHONPATH` contains:
+請確認 `PYTHONPATH` 包含：
 
 ```text
 $PINOCCHIO_WS/.python-casadi
 ```
 
-### `pinocchio.casadi` Cannot Be Imported
+### 找不到 `pinocchio.casadi`
 
-Make sure `PYTHONPATH` contains:
+請確認 `PYTHONPATH` 包含：
 
 ```text
 $PINOCCHIO_WS/install-casadi-abi0/lib/python3.12/site-packages
 ```
 
-Also check that `pinocchio_pywrap_casadi` was built and installed successfully.
+並確認已經成功編譯與安裝 `pinocchio_pywrap_casadi`。
 
-### `DeprecatedBool` Converter Warning
+### 出現 `DeprecatedBool` converter warning
 
-You may see:
+可能看到：
 
 ```text
 RuntimeWarning: to-Python converter for pinocchio::python::DeprecatedBool already registered
 ```
 
-This happens because the same Python process loads both the default wrapper and the CasADi wrapper, and both register the same Boost.Python converter. It does not currently block `pinocchio.casadi` ABA computations.
+這是因為同一個 Python process 同時載入 default wrapper 與 casadi wrapper，兩者都註冊了相同的 Boost.Python converter。此警告目前不影響 `pinocchio.casadi` 的 ABA 運算。
