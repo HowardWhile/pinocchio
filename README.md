@@ -1,27 +1,50 @@
 # Build `pinocchio.casadi` From Source
 
-This document explains how to clone [HowardWhile/pinocchio](https://github.com/HowardWhile/pinocchio) and build a Python-usable `pinocchio.casadi` module from source.
+[English](README.md) | [繁體中文](README_zh.md)
+
+For regular Pinocchio usage, prefer installing the ROS 2 Jazzy apt package first:
+
+```bash
+sudo apt install ros-jazzy-pinocchio
+```
+
+The main purpose of this document is to clone [HowardWhile/pinocchio](https://github.com/HowardWhile/pinocchio) and build the Python module that is not currently provided by the ROS apt package: `pinocchio.casadi`.
 
 The commands below target Ubuntu / ROS 2 Jazzy / Python 3.12. The build uses a local CasADi Python wheel directory and compiles Pinocchio's CasADi Python wrapper against it.
 
 ## Requirements
 
-Prepare the following tools and libraries:
+These packages do not all come from the Pinocchio repository, and a ROS 2 Jazzy install does not always guarantee every development package is present. Prepare them in two groups: Ubuntu build tools and ROS 2 Jazzy packages.
 
-- CMake
-- A C++17 compiler
-- Python 3 and pip
-- Boost / Boost.Python
-- Eigen3
-- eigenpy
-- urdfdom
-- ROS 2 Jazzy, if you need xacro or ROS-provided urdfdom packages
+Install the Ubuntu build tools and common development packages first:
 
-On a ROS Jazzy system, source the ROS environment first:
+```bash
+sudo apt update
+sudo apt install -y \
+  build-essential \
+  cmake \
+  python3-pip \
+  libboost-all-dev \
+  libeigen3-dev
+```
+
+Then install the ROS 2 Jazzy packages used by this build for Python and URDF support:
+
+```bash
+sudo apt install -y \
+  ros-jazzy-eigenpy \
+  ros-jazzy-urdfdom \
+  ros-jazzy-urdfdom-headers \
+  ros-jazzy-xacro
+```
+
+Source the ROS 2 Jazzy environment:
 
 ```bash
 source /opt/ros/jazzy/setup.bash
 ```
+
+> If you already installed a full ROS 2 Jazzy desktop / development environment, some of these ROS packages may already be present. You can confirm them with commands such as `dpkg -l | grep ros-jazzy-eigenpy`.
 
 ## Download The Source
 
@@ -119,6 +142,12 @@ Run these commands from the Pinocchio repository root.
 
 > If the ROS 2 Jazzy environment has not been loaded yet, run `source /opt/ros/jazzy/setup.bash` first so the ROS / urdfdom library paths are available in the current shell.
 
+> (option) If you use this build often, you can add the environment setup above to `~/.bashrc`. When adding it to `~/.bashrc`, replace `PINOCCHIO_WS` with a fixed path, for example:
+>
+> ```shell
+> export PINOCCHIO_WS="$HOME/workspaces/git_ws/pinocchio"
+> ```
+
 ## Verify `pinocchio.casadi`
 
 Run a minimal import check:
@@ -133,7 +162,7 @@ Expected output includes:
 pinocchio.casadi
 ```
 
-## Test ABA With Unitree URDFs
+## Test ABA With URDFs
 
 Download the Go2 and G1 URDF files into `~/Downloads/test_urdf`:
 
@@ -155,6 +184,8 @@ Sources:
 - [Unitree G1 description](https://github.com/unitreerobotics/unitree_ros/tree/master/robots/g1_description)
 
 This branch includes a small smoke test. First test Go2:
+
+Before running it, complete [Set The Runtime Environment](#set-the-runtime-environment) so the current shell has the required `PYTHONPATH` and `LD_LIBRARY_PATH`.
 
 ```bash
 python3 examples/casadi/urdf-casadi-aba.py \

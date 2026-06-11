@@ -1,27 +1,50 @@
 # 從原始碼編譯 `pinocchio.casadi`
 
-這份文件描述如何從 [HowardWhile/pinocchio](https://github.com/HowardWhile/pinocchio) 下載原始碼，並編譯出可在 Python 中使用的 `pinocchio.casadi`。
+[English](README.md) | [繁體中文](README_zh.md)
+
+一般使用 Pinocchio 時，建議優先透過 ROS 2 Jazzy 的 apt package 安裝：
+
+```bash
+sudo apt install ros-jazzy-pinocchio
+```
+
+這份文件的主要目的，是從 [HowardWhile/pinocchio](https://github.com/HowardWhile/pinocchio) 下載原始碼，編譯出 ROS apt 版目前沒有提供的 Python module：`pinocchio.casadi`。
 
 以下流程以 Ubuntu / ROS 2 Jazzy / Python 3.12 為例。重點是使用本機安裝的 CasADi wheel，並讓 Pinocchio 的 CasADi Python wrapper 以相容的 ABI 編譯。
 
 ## 需求
 
-請先準備以下工具與套件：
+這些套件不全是 Pinocchio repo 內建，也不保證只安裝 ROS 2 Jazzy 就全部具備。建議分成 Ubuntu build tools 與 ROS 2 Jazzy packages 兩部分準備。
 
-- CMake
-- C++17 compiler
-- Python 3 與 pip
-- Boost / Boost.Python
-- Eigen3
-- eigenpy
-- urdfdom
-- ROS 2 Jazzy 環境，若需要使用 xacro 或 ROS 版本的 urdfdom
+先安裝 Ubuntu 端的編譯工具與常用 development packages：
 
-在 Ubuntu / ROS Jazzy 環境中，可先載入 ROS 環境：
+```bash
+sudo apt update
+sudo apt install -y \
+  build-essential \
+  cmake \
+  python3-pip \
+  libboost-all-dev \
+  libeigen3-dev
+```
+
+再準備 ROS 2 Jazzy 端提供給 Pinocchio 找到的 Python / URDF 相關 packages：
+
+```bash
+sudo apt install -y \
+  ros-jazzy-eigenpy \
+  ros-jazzy-urdfdom \
+  ros-jazzy-urdfdom-headers \
+  ros-jazzy-xacro
+```
+
+載入 ROS 2 Jazzy 環境：
 
 ```bash
 source /opt/ros/jazzy/setup.bash
 ```
+
+> 如果已經安裝完整的 ROS 2 Jazzy desktop / development 環境，上面部分 ROS packages 可能已經存在；可以用 `dpkg -l | grep ros-jazzy-eigenpy` 之類的方式確認。
 
 ## 下載原始碼
 
@@ -121,6 +144,12 @@ export LD_LIBRARY_PATH="$PINOCCHIO_WS/install-casadi-abi0/lib:$PINOCCHIO_WS/.pyt
 
 > 如果尚未載入 ROS 2 Jazzy 環境，請先執行 `source /opt/ros/jazzy/setup.bash`，讓 ROS / urdfdom 相關 library path 進入目前 shell。
 
+> (option) 如果會經常使用這個 build，可以將以上環境設定加入 `~/.bashrc`。加入 `~/.bashrc` 時，請將 `PINOCCHIO_WS` 改成固定路徑，例如：
+>
+> ```shell
+> export PINOCCHIO_WS="$HOME/workspaces/git_ws/pinocchio"
+> ```
+
 ## 驗證 `pinocchio.casadi`
 
 先測試 import：
@@ -135,7 +164,7 @@ python3 -c "import casadi; from pinocchio import casadi as cpin; print(cpin.__na
 pinocchio.casadi
 ```
 
-## 使用 Unitree URDF 測試 ABA
+## 使用 URDF 測試 ABA
 
 下載 Go2 與 G1 的 URDF 到 `~/Downloads/test_urdf`：
 
@@ -157,6 +186,8 @@ curl -L \
 - [Unitree G1 description](https://github.com/unitreerobotics/unitree_ros/tree/master/robots/g1_description)
 
 此分支提供一個簡單測試程式。先測 Go2：
+
+執行前，請先完成上一節的[設定執行環境](#設定執行環境)，確保目前 shell 已經包含 `PYTHONPATH` 與 `LD_LIBRARY_PATH`。
 
 ```bash
 python3 examples/casadi/urdf-casadi-aba.py \
