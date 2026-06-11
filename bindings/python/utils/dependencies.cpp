@@ -2,6 +2,8 @@
 // Copyright (c) 2020-2021 INRIA
 //
 
+#include "pinocchio/bindings/python/context.hpp"
+
 #include <eigenpy/deprecation-policy.hpp>
 
 #include <boost/python.hpp>
@@ -43,9 +45,10 @@ namespace pinocchio
 
     namespace bp = boost::python;
 
-    struct DeprecatedBool
+    template<typename Scalar>
+    struct DeprecatedBoolTpl
     {
-      DeprecatedBool(bool value, const std::string & warning_msg)
+      DeprecatedBoolTpl(bool value, const std::string & warning_msg)
       : value(value)
       , warning_msg(warning_msg)
       {
@@ -65,6 +68,8 @@ namespace pinocchio
 
     void exposeDependencies()
     {
+      typedef DeprecatedBoolTpl<context::Scalar> DeprecatedBool;
+
       bp::class_<DeprecatedBool>("DeprecatedBool", bp::no_init)
         .def("__bool__", &DeprecatedBool::__bool__);
 
