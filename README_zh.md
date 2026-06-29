@@ -168,11 +168,9 @@ cmake --install build-casadi-abi1
 執行 Python 程式前，請設定 `PYTHONPATH` 與 `LD_LIBRARY_PATH`：
 
 ```bash
-export PINOCCHIO_WS="$HOME/workspaces/git_ws/pinocchio"
+export PINOCCHIO_WS="$PWD"
 export CASADI_PREFIX="$PINOCCHIO_WS/install-casadi-dependency-abi1"
-
 export PYTHONPATH="$PINOCCHIO_WS/install-casadi-abi1/lib/python3.12/site-packages:$CASADI_PREFIX/python:${PYTHONPATH:-}"
-
 export LD_LIBRARY_PATH="$PINOCCHIO_WS/install-casadi-abi1/lib:$CASADI_PREFIX/lib:${LD_LIBRARY_PATH:-}"
 ```
 
