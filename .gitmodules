@@ -4,3 +4,6 @@
 [submodule "models/example-robot-data"]
 	path = models/example-robot-data
 	url = https://github.com/Gepetto/example-robot-data.git
+[submodule "external/casadi"]
+	path = external/casadi
+	url = https://github.com/casadi/casadi.git

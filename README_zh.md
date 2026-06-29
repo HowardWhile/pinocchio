@@ -10,7 +10,7 @@ sudo apt install ros-jazzy-pinocchio
 
 這份文件的主要目的，是從 [HowardWhile/pinocchio](https://github.com/HowardWhile/pinocchio) 下載原始碼，編譯出 ROS apt 版目前沒有提供的 Python module：`pinocchio.casadi`。
 
-以下流程以 Ubuntu / ROS 2 Jazzy / Python 3.12 為例。重點是使用本機安裝的 CasADi wheel，並讓 Pinocchio 的 CasADi Python wrapper 以相容的 ABI 編譯。
+以下流程以 Ubuntu / ROS 2 Jazzy / Python 3.12 為例。重點是從原始碼建立 ABI 1 CasADi，並讓 Pinocchio default 與 CasADi Python wrappers 使用相同 ABI。
 
 ## 需求
 
@@ -23,9 +23,17 @@ sudo apt update
 sudo apt install -y \
   build-essential \
   cmake \
+  git \
+  gfortran \
+  swig \
   python3-pip \
+  python3-dev \
+  python3-numpy \
   libboost-all-dev \
-  libeigen3-dev
+  libeigen3-dev \
+  liblapack-dev \
+  pkg-config \
+  coinor-libipopt-dev
 ```
 
 再準備 ROS 2 Jazzy 端提供給 Pinocchio 找到的 Python / URDF 相關 packages：
@@ -54,7 +62,6 @@ cd ~/workspaces/git_ws
 
 git clone --recursive https://github.com/HowardWhile/pinocchio.git
 cd pinocchio
-git checkout feature/build-casadi
 ```
 
 若已經 clone 過，但 submodule 尚未初始化：
@@ -63,30 +70,58 @@ git checkout feature/build-casadi
 git submodule update --init --recursive
 ```
 
-## 準備 CasADi Python wheel
+## 編譯 ABI 1 CasADi
 
-建立一個本地資料夾放 CasADi wheel 內容：
+不要直接使用 x86_64 的 pip CasADi wheel。該 wheel 使用
+`_GLIBCXX_USE_CXX11_ABI=0`，但 ROS 2 Jazzy 的 Pinocchio、eigenpy 與一般 GCC
+build 預設使用 ABI 1。若 default 與 CasADi wrapper 使用不同 ABI，將
+`pinocchio.Model` 傳給 `pinocchio.casadi.Model` 時可能直接 segmentation fault。
+
+此分支已將 CasADi 3.7.2 固定為 `external/casadi` submodule。完成上一節的
+`git submodule update --init --recursive` 後，直接從該目錄建立 ABI 1 安裝：
 
 ```bash
-python3 -m pip install --target .python-casadi --no-deps casadi
+cd ~/workspaces/git_ws/pinocchio
+
+export PINOCCHIO_WS="$PWD"
+export CASADI_SOURCE="$PINOCCHIO_WS/external/casadi"
+export CASADI_BUILD="$PINOCCHIO_WS/build-casadi-dependency-abi1"
+export CASADI_PREFIX="$PINOCCHIO_WS/install-casadi-dependency-abi1"
+
+cmake -S "$CASADI_SOURCE" -B "$CASADI_BUILD" \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_INSTALL_PREFIX="$CASADI_PREFIX" \
+  -DPYTHON_PREFIX="$CASADI_PREFIX/python" \
+  -DWITH_PYTHON=ON \
+  -DWITH_PYTHON3=ON \
+  -DWITH_IPOPT=ON \
+  -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=1"
+
+cmake --build "$CASADI_BUILD" -j"$(nproc)"
+cmake --install "$CASADI_BUILD"
 ```
 
-這裡刻意使用 `--no-deps`，避免 pip 把新的 NumPy wheel 安裝到 `.python-casadi`。Pinocchio / eigenpy 會使用系統的 NumPy，若 `.python-casadi` 中有 NumPy 2.x，可能在 import 時造成 ABI 警告或 crash。
-
-確認 CasADi 可被載入：
+確認 Python module 與 Ipopt 可以使用：
 
 ```bash
-PYTHONPATH="$PWD/.python-casadi:$PYTHONPATH" python3 -c "import casadi; print(casadi.__version__)"
+env \
+  PYTHONPATH="$CASADI_PREFIX/python" \
+  LD_LIBRARY_PATH="$CASADI_PREFIX/lib" \
+  python3 -c "import casadi as ca; x=ca.MX.sym('x'); s=ca.nlpsol('s','ipopt',{'x':x,'f':(x-2)**2}); print(float(s(x0=0)['x']))"
 ```
 
 ## 設定 CMake
 
-建立獨立的 build 與 install 目錄：
+回到 Pinocchio repo，建立獨立的 ABI 1 build 與 install 目錄：
 
 ```bash
-cmake -S . -B build-casadi-abi0 \
+cd ~/workspaces/git_ws/pinocchio
+export CASADI_PREFIX="$PWD/install-casadi-dependency-abi1"
+
+cmake -S . -B build-casadi-abi1 \
   -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_INSTALL_PREFIX="$PWD/install-casadi-abi0" \
+  -DCMAKE_INSTALL_PREFIX="$PWD/install-casadi-abi1" \
+  -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=1" \
   -DBUILD_PYTHON_INTERFACE=ON \
   -DBUILD_WITH_CASADI_SUPPORT=ON \
   -DBUILD_WITH_URDF_SUPPORT=ON \
@@ -94,7 +129,7 @@ cmake -S . -B build-casadi-abi0 \
   -DBUILD_EXAMPLES=OFF \
   -DBUILD_TESTING=OFF \
   -DPYTHON_EXECUTABLE=/usr/bin/python3 \
-  -Dcasadi_DIR="$PWD/.python-casadi/casadi/cmake" \
+  -Dcasadi_DIR="$CASADI_PREFIX/lib/cmake/casadi" \
   -Deigenpy_DIR=/opt/ros/jazzy/lib/x86_64-linux-gnu/cmake/eigenpy
 ```
 
@@ -109,23 +144,23 @@ cmake -S . -B build-casadi-abi0 \
 ## 編譯
 
 ```bash
-time cmake --build build-casadi-abi0 -j"$(nproc)"
+time cmake --build build-casadi-abi1 -j"$(nproc)"
 ```
 
 > (option) 如果只想先確認 Python wrapper 能否編譯，可使用：
 >
 > ```shell
-> time cmake --build build-casadi-abi0 --target pinocchio_pywrap_default -j"$(nproc)"
-> time cmake --build build-casadi-abi0 --target pinocchio_pywrap_casadi -j"$(nproc)"
+> time cmake --build build-casadi-abi1 --target pinocchio_pywrap_default -j"$(nproc)"
+> time cmake --build build-casadi-abi1 --target pinocchio_pywrap_casadi -j"$(nproc)"
 > ```
 
 ## 安裝
 
 ```bash
-cmake --install build-casadi-abi0
+cmake --install build-casadi-abi1
 ```
 
-> 安裝後，Python package 會位於 `install-casadi-abi0/lib/python3.12/site-packages`
+> 安裝後，Python package 會位於 `install-casadi-abi1/lib/python3.12/site-packages`
 >
 
 ## 設定執行環境
@@ -133,11 +168,12 @@ cmake --install build-casadi-abi0
 執行 Python 程式前，請設定 `PYTHONPATH` 與 `LD_LIBRARY_PATH`：
 
 ```bash
-export PINOCCHIO_WS="$PWD"
+export PINOCCHIO_WS="$HOME/workspaces/git_ws/pinocchio"
+export CASADI_PREFIX="$PINOCCHIO_WS/install-casadi-dependency-abi1"
 
-export PYTHONPATH="$PINOCCHIO_WS/install-casadi-abi0/lib/python3.12/site-packages:$PINOCCHIO_WS/.python-casadi:${PYTHONPATH:-}"
+export PYTHONPATH="$PINOCCHIO_WS/install-casadi-abi1/lib/python3.12/site-packages:$CASADI_PREFIX/python:${PYTHONPATH:-}"
 
-export LD_LIBRARY_PATH="$PINOCCHIO_WS/install-casadi-abi0/lib:$PINOCCHIO_WS/.python-casadi/casadi:${LD_LIBRARY_PATH:-}"
+export LD_LIBRARY_PATH="$PINOCCHIO_WS/install-casadi-abi1/lib:$CASADI_PREFIX/lib:${LD_LIBRARY_PATH:-}"
 ```
 
 請在 Pinocchio repo 根目錄執行以上指令。
@@ -162,6 +198,19 @@ python3 -c "import casadi; from pinocchio import casadi as cpin; print(cpin.__na
 
 ```text
 pinocchio.casadi
+```
+
+只測 import 或 CasADi 端的 ABA 不足以發現 default/CasADi wrapper ABI 不一致。
+必須另外測試跨 wrapper model conversion：
+
+```bash
+python3 -c "import pinocchio as pin; from pinocchio import casadi as cpin; cpin.Model(pin.buildSampleModelManipulator()); print('ABI1 cross-wrapper OK')"
+```
+
+成功時應顯示：
+
+```text
+ABI1 cross-wrapper OK
 ```
 
 ## 使用 URDF 測試 ABA
@@ -228,7 +277,7 @@ pinocchio.casadi URDF ABA test
 請確認 `PYTHONPATH` 包含：
 
 ```text
-$PINOCCHIO_WS/.python-casadi
+$CASADI_PREFIX/python
 ```
 
 ### 找不到 `pinocchio.casadi`
@@ -236,7 +285,7 @@ $PINOCCHIO_WS/.python-casadi
 請確認 `PYTHONPATH` 包含：
 
 ```text
-$PINOCCHIO_WS/install-casadi-abi0/lib/python3.12/site-packages
+$PINOCCHIO_WS/install-casadi-abi1/lib/python3.12/site-packages
 ```
 
 並確認已經成功編譯與安裝 `pinocchio_pywrap_casadi`。
@@ -250,3 +299,15 @@ RuntimeWarning: to-Python converter for pinocchio::python::DeprecatedBool alread
 ```
 
 這是因為同一個 Python process 同時載入 default wrapper 與 casadi wrapper，兩者都註冊了相同的 Boost.Python converter。此警告目前不影響 `pinocchio.casadi` 的 ABA 運算。
+
+### 確認沒有載入舊 ABI 0 安裝
+
+若曾按照舊版流程使用 `install-casadi-abi0` 或 `.python-casadi`，請從
+`~/.bashrc`、`PYTHONPATH` 與 `LD_LIBRARY_PATH` 移除，並開啟新的 shell。
+
+```bash
+python3 -c "import casadi, pinocchio; print(casadi.__file__); print(pinocchio.__file__)"
+```
+
+輸出路徑應分別位於 `install-casadi-dependency-abi1` 與
+`install-casadi-abi1`。
