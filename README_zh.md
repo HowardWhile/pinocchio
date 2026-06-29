@@ -23,6 +23,7 @@ sudo apt update
 sudo apt install -y \
   build-essential \
   cmake \
+  dpkg-dev \
   git \
   gfortran \
   swig \
@@ -72,9 +73,10 @@ git submodule update --init --recursive
 
 ## 編譯 ABI 1 CasADi
 
-不要直接使用 x86_64 的 pip CasADi wheel。該 wheel 使用
-`_GLIBCXX_USE_CXX11_ABI=0`，但 ROS 2 Jazzy 的 Pinocchio、eigenpy 與一般 GCC
-build 預設使用 ABI 1。若 default 與 CasADi wrapper 使用不同 ABI，將
+為了讓 amd64 與 arm64 得到一致結果，這個流程不要使用 pip CasADi wheel。
+已測試的 x86_64 CasADi 3.7.2 wheel 使用 `_GLIBCXX_USE_CXX11_ABI=0`，而且
+wheel 的 ABI 設定可能因架構而異。ROS 2 Jazzy 的 Pinocchio、eigenpy 與一般
+GCC build 預設使用 ABI 1。若 default 與 CasADi wrapper 使用不同 ABI，將
 `pinocchio.Model` 傳給 `pinocchio.casadi.Model` 時可能直接 segmentation fault。
 
 此分支已將 CasADi 3.7.2 固定為 `external/casadi` submodule。完成上一節的
@@ -118,6 +120,12 @@ env \
 cd ~/workspaces/git_ws/pinocchio
 export CASADI_PREFIX="$PWD/install-casadi-dependency-abi1"
 
+EIGENPY_MULTIARCH="$(dpkg-architecture -qDEB_HOST_MULTIARCH)"
+case "$EIGENPY_MULTIARCH" in
+  x86_64-linux-gnu|aarch64-linux-gnu) ;;
+  *) echo "不支援的架構：$EIGENPY_MULTIARCH"; exit 1 ;;
+esac
+
 cmake -S . -B build-casadi-abi1 \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="$PWD/install-casadi-abi1" \
@@ -130,7 +138,7 @@ cmake -S . -B build-casadi-abi1 \
   -DBUILD_TESTING=OFF \
   -DPYTHON_EXECUTABLE=/usr/bin/python3 \
   -Dcasadi_DIR="$CASADI_PREFIX/lib/cmake/casadi" \
-  -Deigenpy_DIR=/opt/ros/jazzy/lib/x86_64-linux-gnu/cmake/eigenpy
+  -Deigenpy_DIR="/opt/ros/jazzy/lib/${EIGENPY_MULTIARCH}/cmake/eigenpy"
 ```
 
 > (option) 如果 CMake 嘗試下載 `jrl-cmakemodules`，但目前環境沒有網路，可以先提供一份已存在的 `jrl-cmakemodules` source，並在 CMake 指令中加上：
@@ -186,6 +194,19 @@ export LD_LIBRARY_PATH="$PINOCCHIO_WS/install-casadi-abi1/lib:$CASADI_PREFIX/lib
 
 ## 驗證 `pinocchio.casadi`
 
+先確認兩個 CMake build 都使用 ABI 1：
+
+```bash
+grep '^CMAKE_CXX_FLAGS:' "$PINOCCHIO_WS/build-casadi-dependency-abi1/CMakeCache.txt"
+grep '^CMAKE_CXX_FLAGS:' "$PINOCCHIO_WS/build-casadi-abi1/CMakeCache.txt"
+```
+
+兩行都必須包含：
+
+```text
+-D_GLIBCXX_USE_CXX11_ABI=1
+```
+
 先測試 import：
 
 ```bash
@@ -210,6 +231,17 @@ python3 -c "import pinocchio as pin; from pinocchio import casadi as cpin; cpin.
 ```text
 ABI1 cross-wrapper OK
 ```
+
+兩種支援架構的預期結果相同：
+
+| 元件 | amd64 | arm64 |
+| --- | --- | --- |
+| CasADi C++ library 與 Python module | ABI 1 | ABI 1 |
+| Pinocchio default library 與 Python wrapper | ABI 1 | ABI 1 |
+| Pinocchio CasADi library 與 Python wrapper | ABI 1 | ABI 1 |
+
+唯一因架構而異的是 `EIGENPY_MULTIARCH`：amd64 會得到
+`x86_64-linux-gnu`，arm64 會得到 `aarch64-linux-gnu`。
 
 ## 使用 URDF 測試 ABA
 
@@ -266,7 +298,7 @@ pinocchio.casadi URDF ABA test
   casadi function inputs: 3, outputs: 1
 ```
 
-`aba` 是 Articulated Body Algorithm，用於前向動力學。這個測試會建立 symbolic `q`、`v`、`tau`，並確認 `pinocchio.casadi` 可以產生 CasADi symbolic acceleration expression。
+ABA 是 Articulated Body Algorithm（關節體演算法）的縮寫，用於前向動力學。這個測試會建立 symbolic `q`、`v`、`tau`，並確認 `pinocchio.casadi` 可以產生 CasADi symbolic acceleration expression。
 
 ## 常見問題
 
